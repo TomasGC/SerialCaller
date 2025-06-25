@@ -1,0 +1,124 @@
+trigger:
+  branches:
+    include:
+    - master
+    - main
+
+parameters:
+- name: nugetFeedName
+  type: string
+  default: 'Limonetik/lmk-nuget'
+- name: userEmail
+  type: string
+- name: userPassword
+  type: string
+
+stages:
+- stage: Versioning
+
+  jobs:
+  - job: VersionBuild
+
+    pool:
+      vmImage: windows-latest
+    displayName: Version build
+
+    steps:
+    - checkout: self
+      fetchDepth: 0
+      persistCredentials: true
+
+    - task: NuGetToolInstaller@1
+      displayName: 'nuget install'
+      inputs:
+        versionSpec: 
+        checkLatest: true
+
+    - task: gitversion/setup@3
+      displayName: 'GitVersion setup'
+      inputs:
+        versionSpec: '5.x'
+
+    - task: gitversion/execute@3
+      displayName: 'Versioning with GitVersion'
+
+    - task: PowerShell@2
+      displayName: Set up build version
+      name: setVersion
+      inputs:
+        targetType: inline
+        script: |
+            $computedVersionWithPrefix = "CD $(GitVersion_SemVer)"
+            Write-Host "##vso[build.updatebuildnumber]$computedVersionWithPrefix"
+            Write-Host "##vso[task.setvariable variable=version;isOutput=true]$(GitVersion_SemVer)"
+
+    - task: PowerShell@2
+      displayName: Push version into git tag
+      name: pushVersion
+      inputs:
+        targetType: inline
+        script: |
+            nuget list dotnet-test -AllVersions | Select-Object -Last 1
+
+            git config --global user.email "azdevopsautomation@myapp.com"
+            git config --global user.name "Azure DevOps Automation"
+            git tag $(GitVersion_SemVer) # Associate the version to the current checkout commit
+            git push origin $(GitVersion_SemVer) # Push the new tag in git repository
+- stage: DotNetTool
+
+  dependsOn:
+  - Versioning
+
+  jobs:
+  - job: ''
+    displayName: CD dotnet tool App
+
+    pool:
+      vmImage: windows-latest
+
+    variables:
+    - name: buildConfiguration
+      value: Release
+    - name: buildPlatform
+      value: Any CPU
+    - name: version
+      value: $[ stageDependencies.Versioning.VersionBuild.outputs['setVersion.version'] ]
+
+    steps:
+    - checkout: self
+      fetchDepth: 0
+
+    - task: NuGetToolInstaller@1
+      displayName: 'nuget install'
+      inputs:
+        versionSpec: 
+        checkLatest: true
+
+    - task: DotNetCoreCLI@2
+      displayName: 'dotnet restore'
+      inputs:
+        command: 'restore'
+        projects: '**/App.csproj'
+        vstsFeed: ${{ parameters.nugetFeedName }}
+
+    - task: DotNetCoreCLI@2
+      displayName: 'dotnet build'
+      inputs:
+        command: 'build'
+        projects: '**/App.csproj'
+        arguments: '--configuration Release --no-restore -p:Version=$(version)'
+
+    - task: DotNetCoreCLI@2
+      displayName: 'dotnet publish'
+      inputs:
+        command: 'publish'
+        publishWebProjects: false
+        projects: '**/App.csproj'
+        arguments: '--configuration Release --no-restore --no-build --output $(Build.ArtifactStagingDirectory)'
+        zipAfterPublish: True
+
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish artifact'
+      inputs:
+        pathtoPublish: '$(Build.ArtifactStagingDirectory)' 
+        artifactName: '$(Build.BuildNumber)'

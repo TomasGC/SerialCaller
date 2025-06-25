@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+	<TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);CopyProjectReferencesToPackage</TargetsForTfmSpecificBuildOutput>
+	<PackAsTool>true</PackAsTool>
+	<PackageId>dotnet-sc</PackageId>
+	<ToolCommandName>dotnet-sc</ToolCommandName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+	<Authors>Tomas Gomes Cardoso</Authors>
+	<Description>sc CLI tool to handle massive catchup.</Description>
+	<Platforms>AnyCPU;x64</Platforms>
+	<PackageTags>Massive catchup;Tools</PackageTags>
+	<RootNamespace>SerialCaller.App</RootNamespace>
+	<AssemblyName>SerialCaller.App</AssemblyName>
+  </PropertyGroup>
+
+	<ItemGroup>
+	  <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
+	  <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+	  <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.2" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\APIs\OfficialJokeApi\OfficialJokeApi.csproj" />
+	</ItemGroup>
+
+</Project>
